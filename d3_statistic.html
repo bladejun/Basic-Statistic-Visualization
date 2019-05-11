@@ -1,0 +1,1131 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+<title>과제</title>
+<style>
+	#data {
+		margin:0 0 0 50px;
+		width:300px;
+	}
+	.c1 { 
+		text-align:center; 
+		font-size:1.2em;
+	}
+	#select {
+		margin:10px 0 0 50px;
+	} 
+	#div1 {
+		margin:0 0 0 50px;
+	}	
+	#menu {
+		display:none;
+	}
+	#column, #column1, #column2, #column3, #color {
+	   -webkit-border-radius: 20px;
+	   -moz-border-radius: 20px;
+	   border-radius: 20px;
+	   padding-left: 15px;
+	   width:100px;
+	   height:30px;
+	   font-size:1.2em;
+	   margin:0 5px 0 0;
+	}
+	#menu_bar, #menu_histo, #menu_scatter{
+		display:none;
+	}
+	#main > #left {
+		width:30%;
+		height:100%;
+		float:left;
+	}
+	#main > #center{
+		width:40%;
+		height:100%;
+		float:left;
+	}
+	#main > #right{
+		width:30%;
+		height:100%;
+		float:left;
+	}
+	#right > #up, #down{
+		width:50%;
+		height:100%;
+		float:left;
+	}
+	#left, #center, #right{
+		overflow:auto;
+	}
+	.c2{
+		text-align:center;
+		width:200px;
+	}
+	.b{
+		fill:#FFEBCD;
+	}
+</style>
+</head>
+<body>
+	<div id="div1" class="btn btn-primary btn-sm float-left">
+		<input type="file" accept=".csv" id="fileUpload">
+	</div>
+	&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
+	<input type="button" class="btn btn-danger" value="막대그래프" onClick="bargraph()">
+	<input type="button" class="btn btn-danger" value="히스토그램" onClick="histogram()">
+	<input type="button" class="btn btn-danger" value="산점도" onClick="scatter()">
+	<input type="button" class="btn btn-danger" value="산점도행렬" onClick="scatter_matrix()">
+	SVG 가로 길이 : <input type="text" id="width" value="500" size="10">
+	SVG 세로 길이 : <input type="text" id="height" value="500" size="10">
+	<div id="select">
+		<div id="menu_bar">
+			<b>막대그래프</b> <br>
+		</div>
+		<div id="menu_histo">
+			<b>히스토그램</b> <br>
+			구간시작 : <input type="text" id="start" value="6">
+			<input type="radio" name="bin" value="bin1"> 구간 개수
+			<input type="radio" name="bin" value="bin2" checked="on"> 구간 간격
+			<input type="text" id="bin3" value="10">
+		</div>
+		<div id="menu_scatter">
+			<b>산점도</b> <br>
+			<input type="button" class="btn btn-info" value="회귀직선" id="regress" onclick="scatter()">
+		</div>
+	</div>
+	<hr/>
+	<div id="main">
+		<div id="left"></div>
+		<div id="center">
+			<svg id="svg"></svg>
+		</div>
+		<div id="right">
+			<div id="up"></div>
+			<div id="down"></div>
+		</div>
+	</div>
+	<hr/> 
+	<script type="text/javascript">
+		//csv 입력받기
+		$("#fileUpload").change(function(e) {
+			var fileUpload = document.getElementById("fileUpload");
+		    var regex = /^([a-zA-Z0-9\s_\\.\-:])+(.csv|.txt)$/;
+		    if (regex.test(fileUpload.value.toLowerCase())) {
+		        if (typeof (FileReader) != "undefined") {
+		            var reader = new FileReader();
+		            reader.onload = function (e) {
+		                var table = "<table id='data' border='1'>"
+		                var rows = e.target.result.split("\n");
+		                var menu_length = rows[0].split(",").length;
+		                var menu_name = rows[0].split(",");
+		                
+		                //드롭박스 만들기
+		                var menu = "<select id='column' onChange='bargraph()'>";
+			            for(var i = 0; i < menu_length; i++) {
+			            	if(i == 3) {
+				                menu += "<option selected='selected' value="+ i +">"+ menu_name[i]+"</option>";
+			            	}
+			            	else {
+				                menu += "<option value="+ i +">"+ menu_name[i]+"</option>";
+			            	}
+		                }
+			            menu += "</select>";
+			            $("#menu_bar").append(menu);
+			            
+			            var menu2 = "x축 : <select id='column2' onChange='scatter()'>";
+			            for(var i = 0; i < menu_length; i++) {
+			            	if(i == 0) {
+				                menu2 += "<option selected='selected' value="+ i +">"+ menu_name[i]+"</option>";
+			            	}
+			            	else {
+				                menu2 += "<option value="+ i +">"+ menu_name[i]+"</option>";
+			            	}
+		                }
+			            menu2 += "</select>";
+			            $("#menu_scatter").append(menu2);
+			            
+			            var menu3 = "y축 : <select id='column3' onChange='scatter()'>";
+			            for(var i = 0; i < menu_length; i++) {
+			            	if(i == 1) {
+				                menu3 += "<option selected='selected' value="+ i +">"+ menu_name[i]+"</option>";
+			            	}
+			            	else {
+				                menu3 += "<option value="+ i +">"+ menu_name[i]+"</option>";
+			            	}
+		                }
+			            menu3 += "</select>";
+			            $("#menu_scatter").append(menu3);
+			            
+			            var menu4 = "집단별 구분 : <select id='color' onChange='scatter()'>";
+			            for(var i = 0; i < menu_length; i++) {
+			            	if(i == menu_length - 1) {
+			            		menu4 += "<option selected='selected' value="+ i +">"+ menu_name[i]+"</option>";
+			            	}
+			            	else {
+				                menu4 += "<option value="+ i +">"+ menu_name[i]+"</option>";
+
+			            	}
+		                }
+			            menu4 += "</select>";
+			            $("#menu_scatter").append(menu4);
+			            
+			            var menu5 = "<select id='column1' onChange='histogram()'>";
+			            for(var i = 0; i < menu_length; i++) {
+			                menu5 += "<option value="+ i +">"+ menu_name[i]+"</option>";
+		                }
+			            menu5 += "</select>";
+			            $("#menu_histo").append(menu5);
+			            
+		                for(var i = 0; i < rows.length - 1; i++) {
+		                	table += "<tr class='c1'>";
+		                    var cells = rows[i].split(",");
+		                    for(var j = 0; j < cells.length; j++) {
+		                    	table += "<td>" + cells[j] + "</td>";
+		                    }
+		                    table += "</tr>";
+		                }
+		                table += "</table>";
+		                $("#left").append(table);
+		            }
+		            reader.readAsText(fileUpload.files[0]);
+		        } 
+		    } 
+		});
+		
+		function summary(input) {
+			var output = new Array(4);
+			var max = input[0];
+			var min = input[0];
+			var sum = 0;
+			for(var i = 0; i < input.length; i++) {
+				if(input[i] > max) {
+					max = input[i];
+				}
+				if(input[i] < min) {
+					min = input[i];
+				}
+				sum += input[i];
+			}
+			var avg = sum / input.length;
+			var sum1 = 0;
+			for(var i = 0; i < input.length; i++) {
+				var temp = input[i] - avg;
+				sum1 = sum1 + temp * temp;
+			}
+			var variance = sum1 / input.length;
+			var sd = Math.sqrt(variance);
+			
+			var input2 = input.sort(function(a, b){
+					return a - b;
+			});
+			
+			var median = 0;
+			var q1 = 0;
+			var q2 = 0;
+			if(input.length % 2 == 1) {
+				var a = Math.floor(input.length / 2);
+				var b = a - Math.round(a / 2);
+				var c = a + Math.round(a / 2);
+				median = input2[a];
+			}
+			else {
+				var a = Math.floor(input.length / 2);
+				var b = median - Math.round(a / 2);
+				var c = median + Math.round(a / 2) - 1;
+				median = (input2[a] + input2[a-1]) / 2;
+			}
+			
+			q1 = input2[b];
+			q2 = input2[c];
+			
+			output[0] = min;
+			output[1] = max;
+			output[2] = avg;
+			output[3] = Math.round(sd * 100)/ 100;
+			output[4] = sum;
+			output[5] = max - min;
+			output[6] = median;
+			output[7] = q1;
+			output[8] = q2;
+			output[9] = q2 - q1;
+			
+			return output;
+		}
+		
+		function count(input, between, min, bin) {
+			var output = new Array(between);
+			for(var i = 0; i < between; i++) {
+				output[i] = 0;
+			}
+			
+			for(var j = 0; j < input.length; j++) {	
+				var check = Math.floor((input[j] - min) / bin);
+				if(check == between) {
+					check -= 1;
+				}
+				output[check] += 1;
+			}
+			return output;
+		}
+		
+		function countRatio(input, bin) {
+			var output = new Array(input.length);
+			var sum = 0;
+			for(var i = 0; i < input.length; i++) {
+				sum += input[i];
+			}
+			for(var i = 0; i < input.length; i++) {
+				output[i] = (input[i] / sum) / bin;
+			}
+			return output;
+		}
+		
+		//정규분포
+		function Nd(x, mu, sd) {
+		   	return (1 / Math.sqrt(2 * Math.PI) * sd) * Math.exp(-( ((x - mu) * (x - mu)) / (2 * sd * sd) ) );
+		}
+		
+		//x좌표 변경
+		function changeX(x, xMaxG, xMinG, xMin, xMax) {
+			return (xMaxG - xMinG) * (x - xMin) / (xMax - xMin) + xMinG;
+		}
+		
+		//y좌표 변경
+		function changeY(y, yMaxG, yMinG, yMin, yMax) {
+			return (yMaxG - yMinG) - (yMaxG - yMinG) * (y - yMin) / (yMax - yMin) + yMinG;
+		}
+		
+		//정규분포 곡선 그리기
+		function drawnd(object, xMaxG, xMinG, xMin, xMax, yMaxG, yMinG, yMin, yMax, mu, sd) {
+			for(var i = xMin; i <= xMax; i+=0.01) {
+				object.append("line")
+				      .attr("x1", changeX(i, xMaxG, xMinG, xMin, xMax))
+				      .attr("y1", changeY(Nd(i, mu, sd), yMaxG, yMinG, yMin, yMax))
+				      .attr("x2", changeX(i + 0.01, xMaxG, xMinG, xMin, xMax))
+				      .attr("y2", changeY(Nd(i + 0.01, mu, sd), yMaxG, yMinG, yMin, yMax))
+				      .attr("stroke", "red")
+				      .attr("stroke-width", "2px")
+			}
+		}
+		
+		//막대그래프 히스토그램 구별
+		function distinct(input) {
+			var set = new Set();
+			for(var i = 0; i < input.length; i++) {
+				set.add(input[i]);
+			}
+			return set.size;
+		}
+		
+		//막대그래프 개수별 카운트
+		function count2(input) {
+			var output = new Array();
+			var set = new Set();
+			for(var i = 0; i < input.length; i++) {
+				set.add(input[i]);
+			}
+			count3 = 0;
+			for(let item of set) {
+				output[count3] = item;
+				count3++;
+			}
+			output.sort(function(a, b){
+				return a - b;
+			});
+			return output;
+		}
+		
+		//회귀직선 추정
+		function regression(input_x, input_y, output) {
+			var n = input_x.length;
+			var sum_x = 0;
+			var sum_y = 0;
+			var sum_xx = 0;
+			var sum_yy = 0;
+			var sum_xy = 0;
+			
+			for(var i = 0; i < n; i++) {
+				sum_x += input_x[i];
+				sum_y += input_y[i];
+				sum_xx += (input_x[i] * input_x[i]);
+				sum_yy += (input_y[i] * input_y[i]);
+				sum_xy += (input_x[i] * input_y[i]);
+			}
+			
+			var summary_x = summary(input_x);
+			var summary_y = summary(input_y);
+			
+			var b = ((n * sum_xy) - (sum_x * sum_y)) / ((n * sum_xx) - (sum_x * sum_x));
+			var a = summary_y[2] - b * summary_x[2];
+			
+			output[0] = a;
+			output[1] = b;
+		}
+		
+		//막대그래프 카운트
+		function dataCount(input1, input2, output) {
+			for(var i = 0; i < input1.length; i++) {
+				var item = input1[i];
+				var cnt = 0;
+				for(var j = 0; j < input2.length; j++) {
+					if(item == input2[j]) {
+						cnt++;
+					}
+				}
+				output[i] = cnt;
+			}
+		}
+		
+		//2개의 데이터 동시 선택
+		function select_data(input, a, b, result_x, result_y) {
+			var num_x = 0;
+	        var num_y = 0;
+	        for(var i = 0; i < input[0].length; i++) {
+        		for(var j = 1; j < input.length; j++) {
+        			if(i == a) {
+        				result_x[num_x] = parseInt(input[j][i]);
+        				num_x++;
+        			}
+        			if(i == b) {
+        				result_y[num_y] = parseInt(input[j][i]);
+        				num_y++;
+        			}
+        		}
+	        }
+		}
+		
+		function histogram() {
+			$("#menu_histo").css("display", "block");	
+			$("#menu_bar").css("display", "none");	
+			$("#menu_scatter").css("display", "none");	
+			$("#up").empty();
+			$("#down").empty();
+			$("#center").empty();
+			
+			//svg 가로 세로 입력 받기
+			var one = parseInt(document.getElementById("width").value);
+			var two = parseInt(document.getElementById("height").value);
+			
+			var svg = "<svg width="+ one +" height="+ two +" id=svg></svg>";
+			$("#center").append(svg);
+			
+			//svg 그림 그리기
+		  	var svg = d3.select("#svg")
+				  	    .attr("width", one)
+				  		.attr("height", two)
+				  		.style("border", "1px solid black")
+				  		
+			//svg 그림 위에 지우기
+			svg.append("rect")
+			   .attr("x", 0)
+			   .attr("y", 0)
+			   .attr("width", one)
+			   .attr("height", two)
+			   .style("fill", "white")
+
+			//margin 구하기
+			var margin = {top: two / 7, right: one / 7, bottom: two / 10, left: one / 10};
+				  		
+			//table에서 2차원 배열 받기
+			var check = new Array();
+			var table = document.getElementById("data");
+			for(var i = 0; i < table.rows.length; i++) {
+				check[i] = new Array(table.rows[i].cells.length);
+				for(var j = 0; j < table.rows[i].cells.length; j++) {
+					check[i][j] = table.rows[i].cells[j].innerHTML;
+				}
+			}
+			
+			//선택된 열명 가져오기
+	        var selectedText = $("#column1 option:selected").val();
+			
+			//선택된 열의 데이터 가져오기
+	        var result = new Array();
+	        var num = 0;
+	        for(var i = 0; i < check[0].length; i++) {
+	        	if(i == selectedText) {
+	        		for(var j = 1; j < check.length; j++) {
+	        			result[num] = check[j][i];
+	        			num++;
+	        		}
+	        		break;
+	        	}
+	        }
+	        
+	    	//배열 데이터 개수
+			var num = result.length;
+	    	
+	    	//데이터 종류가 10개 미만이면 히스토그램 그릴 수 없다는 경고 표시
+			if(distinct(result) <= 10) {
+				alert("히스토그램을 그릴 수 없습니다!!");
+			}
+			
+	    	//데이터 숫자로 변환
+			for(var i = 0; i < result.length; i++) {
+        		result[i] = parseInt(result[i]);
+        	}
+        	
+	        //배열 요약통계량
+			var output = summary(result);
+			var min = output[0];
+			var max = output[1];
+			var mu  = output[2];
+			var sd  = output[3];   
+			
+			//도수분포표 표시
+			var arr = count2(result);
+			var result2 = new Array();
+			dataCount(arr, result, result2);
+			
+			var output2 = summary(result2);
+			
+			var table = "<table border='1' class='c2'>";
+			table += "<caption><b>도수 분포표 </b></caption>";
+			table += "<tr><td>변량값</td><td>도수</td><td>백분율</td></tr>";
+			for(var i = 0; i < arr.length; i++) {
+				table += "<tr>";
+				table += "<td>" + arr[i] + "</td>";
+				table += "<td>" + result2[i] +"</td>";
+				table += "<td>" + Math.round((result2[i] * 100 / output2[4]) * 100) / 100 + "%</td>";
+				table += "</tr>";
+			}
+			table += "</table>"
+			$("#up").append(table);
+			
+			//기초통계량 표시
+			var name = ["최소값", "최대값", "평균", "표준편차", "총합", "범위", "중앙값", "Q1", "Q3", "IQR"];
+			var table2 = "<table border='1' class='c2'>";
+			table2 += "<caption><b>기초 통계량</b></caption>";
+			for(var i = 0; i < 10; i++) {
+				table2 += "<tr>";
+				table2 += "<td>" + name[i] + "</td>";
+				table2 += "<td>" + output[i] +"</td>";
+				table2 += "</tr>";
+			}
+			table2 += "</table>"
+			$("#down").append(table2);
+			
+			
+			//구간 시작 값 확인
+			var start = document.getElementById("start").value;
+			if(start !=  "") {
+				start = parseInt(start);
+				if(start < min) {
+					min = start;
+				}
+			}
+			
+			//구간 사이값 설정
+			var checkedValue = $("input[type=radio][name=bin]:checked").val();
+			var between = 0;
+			var bin = 0;
+			if(checkedValue == "bin1") {
+				between = parseInt(document.getElementById("bin3").value);
+				bin = (max - min) / between;
+			}
+			else {
+				bin = parseInt(document.getElementById("bin3").value);
+				if(bin > (max - min)) {
+					alert("구간을 다시 설정해주세요!!");
+				}
+				else {
+					between = Math.ceil((max - min) / bin);
+					max = min + between * bin;
+				}
+			}
+			
+			//구간마다의 개수 찾기
+			var answer = count(result, between, min, bin);
+			var arr2 = new Array();
+	        for(var f = 0; f < answer.length; f++) {
+	        	arr2[f] = answer[f];
+	        }
+			
+			var answerOutput = summary(answer);
+			
+			//구간 비율 
+			var answer2 = countRatio(answer, bin);
+			var answerOutput2 = summary(answer2);
+			
+			var answerOutput3 = summary(result);
+			
+			//구간마다 막대바 그리기
+			for(var i = 0; i < between; i++) {
+				svg.append("rect")
+				   .attr("id", "bar" + i) 
+				   .attr("x", ((one - (margin.left + margin.right)) / between + 1) * i + margin.left * 1.3)
+				   .attr("y", margin.top + ((two - (margin.top + margin.bottom)) / answerOutput[1] * (answerOutput[1] - arr2[i])))
+				   .attr("width", (one - (margin.left + margin.right)) / between)
+				   .attr("height", two - (margin.top + margin.bottom) - (two - (margin.top + margin.bottom)) / answerOutput[1] * (answerOutput[1] - arr2[i]))
+			}
+			
+			//x축 그리기
+			var xScale = d3.scaleLinear()
+	                 	   .domain([min, max])
+	                	   .range([margin.left * 1.3, ((one - (margin.left + margin.right)) / between + 1) * between + margin.left * 1.3]);
+			var xAxis = d3.axisBottom(xScale)
+						  .tickValues(d3.range(xScale.domain()[0], xScale.domain()[1] + 1, bin));
+						  
+			svg.append("g")
+			   .attr("transform", "translate(0,"+ (two - margin.bottom + 3)+")")
+			   .attr("class", "x_axis")
+			   .call(xAxis)
+			
+			//y축 그리기
+			var yScale = d3.scaleLinear()
+	                       .domain([answerOutput[1], 0])
+	                       .range([margin.bottom, two - margin.top]);
+			var yAxis = d3.axisLeft(yScale);
+			
+				
+			svg.append("g")
+			   .attr("transform", "translate("+ margin.left +", "+ margin.top / 3.5+")")
+			   .attr("class", "y_axis")
+			   .call(yAxis)
+			
+			svg.append("text")
+		       .text("Histogram")
+		       .attr("x", (one  - margin.left - margin.right) / 2 - 20)
+		       .attr("y", margin.top / 2)
+		       .style("font-size", "30px")
+		       .style("font-weight", "bold")
+		       
+		    drawnd(svg, one - margin.right, margin.left * 1.3, min, max, two - margin.bottom, margin.top, 
+		    	   0, 1 / Math.sqrt(2 * Math.PI)*sd, mu, sd);
+		}
+		
+		function scatter() {
+			$("#menu_histo").css("display", "none");	
+			$("#menu_bar").css("display", "none");	
+			$("#menu_scatter").css("display", "block");
+			$("#up").empty();
+			$("#down").empty();
+			$("#center").empty();
+			
+			//svg 가로 세로 입력 받기
+			var one = parseInt(document.getElementById("width").value);
+			var two = parseInt(document.getElementById("height").value);
+			
+			var svg = "<svg width="+ one +" height="+ two +" id=svg></svg>";
+			$("#center").append(svg);
+			
+			//svg 그림 그리기
+		  	var svg = d3.select("#svg")
+				  	    .attr("width", one)
+				  		.attr("height", two)
+				  		.style("border", "1px solid black")
+				  		
+			//svg 그림 위에 지우기
+			svg.append("rect")
+			   .attr("x", 0)
+			   .attr("y", 0)
+			   .attr("width", one)
+			   .attr("height", two)
+			   .style("fill", "white")
+			   
+			//margin 구하기
+			var margin = {top: two / 7, right: one / 7, bottom: two / 10, left: one / 10};   
+			
+		  	//선택된 열명 가져오기
+	        var selectedText_x = $("#column2 option:selected").val();
+	        var selectedText_y = $("#column3 option:selected").val();
+	        var selectedText_color = $("#color option:selected").val();
+	        
+		  	//table에서 2차원 배열 받기
+			var check = new Array();
+			var table = document.getElementById("data");
+			for(var i = 0; i < table.rows.length; i++) {
+				check[i] = new Array(table.rows[i].cells.length);
+				for(var j = 0; j < table.rows[i].cells.length; j++) {
+					check[i][j] = table.rows[i].cells[j].innerHTML;
+				}
+			}
+			
+			//선택된 열의 데이터 가져오기
+	        var result_x = new Array();
+	        var num_x = 0;
+	        var result_y = new Array();
+	        var num_y = 0;
+	        var color = new Array();
+	        var num_c = 0;
+	        for(var i = 0; i < check[0].length; i++) {
+        		for(var j = 1; j < check.length; j++) {
+        			if(i == selectedText_x) {
+        				result_x[num_x] = parseInt(check[j][i]);
+        				num_x++;
+        			}
+        			if(i == selectedText_y) {
+        				result_y[num_y] = parseInt(check[j][i]);
+        				num_y++;
+        			}
+        			if(i == selectedText_color) {
+        				color[num_c] = check[j][i];
+        				num_c++;
+        			}
+        		}
+	        }
+	        
+	        var arr_x = new Array();
+	        var arr_y = new Array();
+	        for(var i = 0; i < result_x.length; i++) {
+	        	arr_x[i] = result_x[i];
+	        	arr_y[i] = result_y[i];
+	        }
+	        
+	        //x축, y축 요약 통계량 구하기
+			var output_x = summary(result_x);
+			var output_y = summary(result_y);
+			
+			//색깔 배열
+			var rainbow = ["red", "blue", "green", "purple", "orange", "cyan", "yellow"];
+			var arr = count2(color);
+			
+			//집단별로 색깔 다르게 표시해서 점 찍기
+			for(var i = 0; i < result_x.length; i++) {
+				var color_s = color[i];
+				for(var j = 0; j < arr.length; j++) {
+					if(color_s == arr[j]) {
+						color_s = j;
+						break;
+					}
+				}
+				svg.append("circle")
+				   .attr("cx", changeX(arr_x[i], one - margin.right, margin.left, output_x[0], output_x[1]))
+				   .attr("cy", changeY(arr_y[i], two - margin.bottom, margin.top, 0, output_y[1]))
+				   .attr("r", "4")
+				   .style("fill", rainbow[color_s])
+			}
+			
+			//x축 그리기
+			svg.append("line")
+			   .attr("x1", margin.left * 8 / 10)
+			   .attr("y1", two - margin.bottom * 8 / 10)
+			   .attr("x2", one - margin.right)
+			   .attr("y2", two - margin.bottom * 8 / 10)
+			   .attr("stroke", "black")
+			   .attr("stroke-width", "2px")
+			   
+			var diff = (output_x[1] - output_x[0]) / 5;
+			var change = output_x[0];
+			var bin = (one - (margin.left * 8 / 10 + margin.right)) / 5 - 3;
+			var change2 = margin.left * 8 / 10;
+			for(var i = 0; i <= 5; i++) {
+				if(i == 5) {
+					change = output_x[1];
+				}
+				svg.append("text")
+				   .attr("x", change2)
+				   .attr("y", two - margin.bottom * 4 / 10)
+				   .text(Math.round(change))
+				change += diff;
+			    change2 += bin;
+			}
+			
+			//y축 그리기
+			svg.append("line")
+			   .attr("x1", margin.left * 8 / 10)
+			   .attr("y1", margin.top)
+			   .attr("x2", margin.left * 8 / 10)
+			   .attr("y2", two - margin.bottom * 8 / 10)
+			   .attr("stroke", "black")
+			   .attr("stroke-width", "2px")
+			   
+			var diff = output_y[1] / 10;
+			var change = output_y[1];
+			var bin = (two - (margin.bottom * 8 / 10 + margin.top)) / 10;
+			var change2 = margin.top + 8;
+			for(var i = 0; i <= 10; i++) {
+				if(i == 10) {
+					change = 0;
+				}
+				svg.append("text")
+				   .attr("x", margin.left * 3 / 10)
+				   .attr("y", change2)
+				   .text(Math.round(change))
+				change -= diff;
+			    change2 += bin;
+			}
+			
+			$("#regress").click(function(){
+				//회귀 직선 그리기
+				var regress_line = new Array(2);
+				regression(result_x, result_y, regress_line);
+				
+				var a = regress_line[0];
+				var b = regress_line[1];
+				
+				for(var i = output_x[0]; i <= output_x[1]; i += 0.01) {
+					svg.append("line")
+					   .attr("x1", changeX(i, one - margin.right, margin.left, output_x[0], output_x[1]))
+					   .attr("y1", changeY(a+b*i, two - margin.bottom, margin.top, 0, output_y[1]))
+					   .attr("x2", changeX(i+0.01, one - margin.right, margin.left, output_x[0], output_x[1]))
+					   .attr("y2", changeY(a+b*(i+0.01), two - margin.bottom, margin.top, 0, output_y[1]))
+					   .attr("stroke", "red")
+					   .attr("stroke-width", "2px")
+				}	
+			});
+			
+			
+			//도수분포표 표시
+			var arr = count2(result_x);
+			var result2 = new Array();
+			dataCount(arr, result_x, result2);
+			
+			var output2 = summary(result2);
+
+			var table = "<table border='1' class='c2'>";
+			table += "<caption><b>도수 분포표 </b></caption>";
+			table += "<tr><td>변량값</td><td>도수</td><td>백분율</td></tr>";
+			for(var i = 0; i < arr.length; i++) {
+				table += "<tr>";
+				table += "<td>" + arr[i] + "</td>";
+				table += "<td>" + result2[i] +"</td>";
+				table += "<td>" + Math.round((result2[i] * 100 / output2[4]) * 100) / 100 + "%</td>";
+				table += "</tr>";
+			}
+			table += "</table>"
+			$("#up").append(table);
+			
+			//기초통계량 표시
+			var name = ["최소값", "최대값", "평균", "표준편차", "총합", "범위", "중앙값", "Q1", "Q3", "IQR"];
+			var table2 = "<table border='1' class='c2'>";
+			table2 += "<caption><b>기초 통계량</b></caption>";
+			for(var i = 0; i < 10; i++) {
+				table2 += "<tr>";
+				table2 += "<td>" + name[i] + "</td>";
+				table2 += "<td>" + output_x[i] +"</td>";
+				table2 += "</tr>";
+			}
+			table2 += "</table>"
+			$("#down").append(table2);
+		}
+		
+		function bargraph() {
+			$("#menu_histo").css("display", "none");	
+			$("#menu_bar").css("display", "block");	
+			$("#menu_scatter").css("display", "none");
+			$("#up").empty();
+			$("#down").empty();
+			$("#center").empty();
+			
+			//svg 가로 세로 입력 받기
+			var one = parseInt(document.getElementById("width").value);
+			var two = parseInt(document.getElementById("height").value);
+			
+			var svg = "<svg width="+ one +" height="+ two +" id=svg></svg>";
+			$("#center").append(svg);
+			
+			//svg 그림 그리기
+		  	var svg = d3.select("#svg")
+				  	    .attr("width", one)
+				  		.attr("height", two)
+				  		.style("border", "1px solid black")
+				  		
+			//svg 그림 위에 지우기
+			svg.append("rect")
+			   .attr("x", 0)
+			   .attr("y", 0)
+			   .attr("width", one)
+			   .attr("height", two)
+			   .style("fill", "white")
+			   
+			//margin 구하기
+			var margin = {top: two / 7, right: one / 7, bottom: two / 10, left: one / 10};
+				  		
+			//table에서 2차원 배열 받기
+			var check = new Array();
+			var table = document.getElementById("data");
+			for(var i = 0; i < table.rows.length; i++) {
+				check[i] = new Array(table.rows[i].cells.length);
+				for(var j = 0; j < table.rows[i].cells.length; j++) {
+					check[i][j] = table.rows[i].cells[j].innerHTML;
+				}
+			}
+			
+			//선택된 열명 가져오기
+	        var selectedText = $("#column option:selected").val();
+			
+			//선택된 열의 데이터 가져오기
+	        var result = new Array();
+	        var num = 0;
+	        for(var i = 0; i < check[0].length; i++) {
+	        	if(i == selectedText) {
+	        		for(var j = 1; j < check.length; j++) {
+	        			result[num] = check[j][i];
+	        			num++;
+	        		}
+	        		break;
+	        	}
+	        }
+	        
+	        var another = result;
+	        
+	    	//배열 데이터 개수
+			var num = result.length;
+	    	
+	    	//도수분포표
+			var arr = count2(result);
+			var result2 = new Array();
+			dataCount(arr, result, result2);
+			
+			var arr2 = count2(another);
+			var result3 = new Array();
+			dataCount(arr, another, result3);
+			
+			//배열 요약통계량
+			var output = summary(result2);
+			var min = output[0];
+			var max = output[1];
+			var mu  = output[2];
+			var sd  = output[3];   
+			var sum = output[4];
+			
+			var table = "<table border='1' class='c2'>";
+			table += "<caption><b>도수 분포표 </b></caption>";
+			table += "<tr><th>변량값</th><th>도수</th><th>백분율</th></tr>";
+			for(var i = 0; i < arr.length; i++) {
+				table += "<tr>";
+				table += "<td>" + arr[i] + "</td>";
+				table += "<td>" + result3[i] +"</td>";
+				table += "<td>" + Math.round((result2[i] * 100 / sum) * 100) / 100 + "%</td>";
+				table += "</tr>";
+			}
+			table += "</table>"
+			$("#up").append(table);
+			
+			//막대 사이 간격
+			var side = ((one - margin.left - margin.right) / result2.length) / 5;
+			
+			//막대 그래프 넓이 
+			var bar_width = side * 4;
+			
+			var output = summary(result2);
+			var min = output[0];
+			var max = output[1];
+			for(var i = 0; i < result2.length; i++) {
+				svg.append("rect")
+				   .attr("x", margin.left * 1.5 + (bar_width + side) * i )
+				   .attr("y", margin.top + ((two - (margin.top + margin.bottom)) / max * (max - result3[i])))
+				   .attr("width", bar_width)
+				   .attr("height", (two - margin.bottom) - (margin.top + ((two - (margin.top + margin.bottom)) / max * (max - result3[i]))))
+				   
+				svg.append("text")
+				   .attr("x",  margin.left * 1.5 + (bar_width + side) * i + ((bar_width + side) / 3))
+				   .attr("y", (two + (two / 30)) - margin.bottom)
+				   .text(arr[i])
+			}
+			
+			var yScale = d3.scaleLinear()
+			.domain([max, 0])
+			.range([margin.bottom, two - margin.top]);
+			var yAxis = d3.axisLeft(yScale);
+				
+			svg.append("g")
+			  .attr("transform", "translate("+ margin.left +", "+ margin.top / 3.5+")")
+			  .attr("class", "y_axis")
+			  .call(yAxis)
+		}
+		
+		function scatter_matrix() {
+			$("#menu_histo").css("display", "none");	
+			$("#menu_bar").css("display", "none");	
+			$("#menu_scatter").css("display", "none");
+			$("#up").empty();
+			$("#down").empty();
+			$("#center").empty();
+			
+			//table에서 2차원 배열 받기
+			var check = new Array();
+			var table = document.getElementById("data");
+			for(var i = 0; i < table.rows.length; i++) {
+				check[i] = new Array(table.rows[i].cells.length);
+				for(var j = 0; j < table.rows[i].cells.length; j++) {
+					check[i][j] = table.rows[i].cells[j].innerHTML;
+				}
+			}
+			
+			var len = check[0].length;
+			
+			//데이터 종류 10개 이하 개수 빼기
+			var new_len = 0;
+	        for(var m = 0; m < check[0].length; m++) {
+	        	var minus = 0;
+				var minus_arr = new Array();
+        		for(var n = 1; n < check.length; n++) {
+        			minus_arr[minus] = parseInt(check[n][m]);
+        			minus++;
+        		}
+        		if(distinct(minus_arr) >= 10) {
+        			new_len++;
+        		}
+	        }
+			
+			//svg 가로 세로 입력 받기
+			var one = parseInt(document.getElementById("width").value) / new_len;
+			var two = parseInt(document.getElementById("height").value) / new_len;
+			
+			//margin 구하기
+			var margin = {top: two / 7, right: one / 7, bottom: two / 10, left: one / 10};   
+			
+			//svg 그림 그리기
+			var count_scatter = 1;
+			var count_histo = 1;
+			for(var i = 0; i < len; i++) {
+				for(var j = 0; j < len; j++) {
+					//원하는 데이터 불러오기
+					var result_x = new Array();
+        			var result_y = new Array();   
+        			select_data(check, j, i, result_x, result_y)
+        			
+        			//히스토그램을 그리지 못하는 열은 무시하고 진행
+        			if(distinct(result_x) < 10 | distinct(result_y) < 10) {
+        				continue;
+        			}
+        			
+        			//산점도 그리기
+					if(i != j) { 
+						var svg = "<svg width="+ one +" height="+ two +" id=a"+ count_scatter +"></svg>";
+						$("#center").append(svg);
+						
+						//x축 그리기
+						d3.select("#a"+ count_scatter)
+						  .append("line")
+					      .attr("x1", margin.left * 8 / 10)
+					   	  .attr("y1", two - margin.bottom * 8 / 10)
+					      .attr("x2", one - margin.right)
+					      .attr("y2", two - margin.bottom * 8 / 10)
+					      .attr("stroke", "black")
+					      .attr("stroke-width", "2px")
+					      
+					    //y축 그리기
+					    d3.select("#a"+ count_scatter)
+						  .append("line")
+					      .attr("x1", margin.left * 8 / 10)
+					      .attr("y1", margin.top)
+					      .attr("x2", margin.left * 8 / 10)
+					      .attr("y2", two - margin.bottom * 8 / 10)
+					      .attr("stroke", "black")
+					      .attr("stroke-width", "2px")  
+					      
+	        			var arr_x = new Array();
+				        var arr_y = new Array();
+				        for(var k = 0; k < result_x.length; k++) {
+				        	arr_x[k] = result_x[k];
+				        	arr_y[k] = result_y[k];
+				        }
+				        
+				        //x축, y축 요약 통계량 구하기
+						var output_x = summary(result_x);
+						var output_y = summary(result_y);
+						
+	        			//점찍기
+	        			for(var m = 0; m < arr_x.length; m++) {
+	        				d3.select("#a"+ count_scatter)
+							  .append("circle")
+							  .attr("cx", changeX(arr_x[m], one - margin.right, margin.left, output_x[0], output_x[1]))
+							  .attr("cy", changeY(arr_y[m], two - margin.bottom, margin.top, 0, output_y[1]))
+							  .attr("r", "2")
+	        			}
+	        			
+	        			//회귀직선 그리기
+	        			var regress_line = new Array(2);
+	        			regression(result_x, result_y, regress_line);
+	        			
+	        			var a = regress_line[0];
+	        			var b = regress_line[1];
+	        			
+	        			for(var t = output_x[0]; t <= output_x[1]; t += 0.01) {
+	        				d3.select("#a"+ count_scatter)
+							  .append("line")
+	        				  .attr("x1", changeX(t, one - margin.right, margin.left, output_x[0], output_x[1]))
+	        				  .attr("y1", changeY(a+b*t, two - margin.bottom, margin.top, 0, output_y[1]))
+	        				  .attr("x2", changeX(t+0.01, one - margin.right, margin.left, output_x[0], output_x[1]))
+	        				  .attr("y2", changeY(a+b*(t+0.01), two - margin.bottom, margin.top, 0, output_y[1]))
+	        				  .attr("stroke", "red")
+	        				  .attr("stroke-width", "2px")
+	        			}
+	        			count_scatter++;
+					}
+					//히스토그램 그리기
+					if(i == j) { 
+						var svg = "<svg width="+ one +" height="+ two +" id=b"+ count_histo +"></svg>";
+						$("#center").append(svg);
+						
+						var arr = new Array();
+				        for(var p = 0; p < result_x.length; p++) {
+				        	arr[p] = result_x[p];
+				        }
+				        
+						//배열 요약통계량
+						var output = summary(result_x);
+						var min = output[0];
+						var max = output[1];
+						var mu  = output[2];
+						var sd  = output[3];
+						var bin = 5;
+						var between = Math.ceil((max - min) / bin);
+						max = min + between * bin;
+
+						//구간마다의 개수 찾기
+						var answer = count(arr, between, min, bin);
+						var arr2 = new Array();
+				        for(var f = 0; f < answer.length; f++) {
+				        	arr2[f] = answer[f];
+				        }
+						var answerOutput = summary(answer);
+						
+						//구간마다 막대바 그리기
+						for(var r = 0; r < between; r++) {
+							d3.select("#b"+ count_histo)
+							  .append("rect")
+							  .attr("class", "b")
+							  .attr("x", ((one - (margin.left + margin.right)) / between + 1) * r + margin.left * 1.3)
+							  .attr("y", margin.top + ((two - (margin.top + margin.bottom)) / answerOutput[1] * (answerOutput[1] - arr2[r])))
+							  .attr("width", (one - (margin.left + margin.right)) / between)
+							  .attr("height", two - (margin.top + margin.bottom) - (two - (margin.top + margin.bottom)) / answerOutput[1] * (answerOutput[1] - arr2[r]))
+						}
+						
+						//x축 그리기
+						var xScale = d3.scaleLinear()
+				                 	   .domain([min, max])
+				                	   .range([margin.left * 1.3, ((one - (margin.left + margin.right)) / between + 1) * between + margin.left * 1.3]);
+						var xAxis = d3.axisBottom(xScale)
+									  .tickValues(d3.range(xScale.domain()[0], xScale.domain()[1] + 1, bin));
+							
+						d3.select("#b"+ count_histo)
+						  .append("g")
+						  .attr("transform", "translate(0,"+ (two - margin.bottom - 1)+")")
+						  .attr("class", "x_axis")
+						  .call(xAxis)
+						
+						//y축 그리기
+						var yScale = d3.scaleLinear()
+				                       .domain([answerOutput[1], 0])
+				                       .range([margin.bottom, two - margin.top]);
+						var yAxis = d3.axisLeft(yScale);
+						
+							
+						d3.select("#b"+ count_histo)
+						  .append("g")
+						  .attr("transform", "translate("+ (margin.left + 5) +", "+ margin.top / 3.5+")")
+						  .attr("class", "y_axis")
+						  .call(yAxis)
+						  
+						var svg = d3.select("#b"+ count_histo);
+					    drawnd(svg, one - margin.right, margin.left * 1.3, min, max, two - margin.bottom, margin.top, 
+					    	   0, 1 / Math.sqrt(2 * Math.PI)*sd, mu, sd);
+					    
+						count_histo++;
+					}
+				}
+			}
+			
+			$("#center > svg").css("border", "1px solid black");
+			
+		}
+	</script>
+</body>
+</html>
